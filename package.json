@@ -1,0 +1,13 @@
+{
+  "name": "hc-musify",
+  "private": true,
+  "version": "2.3.8",
+  "description": "HC MUSIFY - Web Music Player",
+  "dependencies": {
+    "axios": "^1.18.1",
+    "web-push": "^3.6.7"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
