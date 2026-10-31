@@ -1,6 +1,6 @@
 const G = require('./_guard.js');
-const { getLyrics1 } = require('./lyrics1.js');
-const { getLyrics2 } = require('./lyrics2.js');
+const { getLyrics1 } = require('../lib/lyrics1.js');
+const { getLyrics2 } = require('../lib/lyrics2.js');
 
 const __handler = async (req, res) => {
     if (req.method === 'OPTIONS') { res.status(200).end(); return; }

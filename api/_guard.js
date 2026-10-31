@@ -42,7 +42,8 @@ function rateLimited(ip, max) {
     rec.count++;
     return rec.count > max;
 }
-function deny(res, code, msg) {
+function deny(res, code, msg, why, req) {
+    try { console.log('[GUARD] ' + code + ' ' + (why || '') + ' url=' + (req && req.url) + ' sfs=' + (req && req.headers['sec-fetch-site']) + ' origin=' + (req && req.headers.origin ? 'ada' : 'kosong') + ' ref=' + (req && req.headers.referer ? 'ada' : 'kosong') + ' ua=' + String((req && req.headers['user-agent']) || '').slice(0, 60)); } catch (e) {}
     res.status(code).json({ status: false, message: msg });
     return false;
 }
@@ -58,15 +59,15 @@ function check(req, res, opts) {
     if (ik && h['x-hc-internal'] === ik) return true;
 
     const ua = String(h['user-agent'] || '');
-    if (!ua || BOT_UA.test(ua)) return deny(res, 403, 'Akses ditolak');
+    if (!ua || BOT_UA.test(ua)) return deny(res, 403, 'Akses ditolak', 'bot-ua', req);
 
     const allowed = allowedHosts(req);
     const sfs = String(h['sec-fetch-site'] || '').toLowerCase();
     const okOrigin = (h.origin && allowed.has(hostOf(h.origin))) || (h.referer && allowed.has(hostOf(h.referer)));
-    if (!(sfs === 'same-origin' || okOrigin)) return deny(res, 403, 'Akses ditolak');
+    if (!(sfs === 'same-origin' || okOrigin)) return deny(res, 403, 'Akses ditolak', 'bukan-same-origin', req);
 
     const max = opts.max || parseInt(process.env.RATE_MAX, 10) || 90;
-    if (rateLimited(ipOf(req), max)) { res.setHeader('Retry-After', '30'); return deny(res, 429, 'Terlalu banyak request, coba lagi sebentar'); }
+    if (rateLimited(ipOf(req), max)) { res.setHeader('Retry-After', '30'); return deny(res, 429, 'Terlalu banyak request, coba lagi sebentar', 'rate-limit', req); }
     return true;
 }
 

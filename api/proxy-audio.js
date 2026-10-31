@@ -33,9 +33,10 @@ module.exports = async (req, res) => {
 
     let upstream;
     try { upstream = await fetchUpstream(targetUrl, headers, ctrl.signal); }
-    catch (err) { if (!res.headersSent) res.status(502).send('Proxy error: ' + err.message); return; }
+    catch (err) { console.log('[AUDIO] fetch gagal: ' + err.message); if (!res.headersSent) res.status(502).send('Proxy error: ' + err.message); return; }
 
     const ct = (upstream.headers.get('content-type') || '').toLowerCase();
+    try { console.log('[AUDIO] upstream status=' + upstream.status + ' host=' + new URL(targetUrl).host + ' ct=' + ct + ' range=' + (req.headers.range || '-')); } catch (e) {}
     if (/^(text\/|application\/(json|xml|javascript))/.test(ct)) {
         try { await upstream.body?.cancel(); } catch (e) {}
         res.status(415).send('Tipe konten tidak diizinkan');
