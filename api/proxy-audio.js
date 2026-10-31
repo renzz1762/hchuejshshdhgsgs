@@ -24,22 +24,36 @@ module.exports = async (req, res) => {
     if (!targetUrl) { res.status(400).send('Missing url parameter'); return; }
     if (G.badTarget(targetUrl)) { res.status(400).send('Target tidak diizinkan'); return; }
 
-    const headers = { 'User-Agent': UA };
-    if (req.headers.range) headers['Range'] = req.headers.range;
+    const host = (() => { try { return new URL(targetUrl).host; } catch (e) { return ''; } })();
+    const mkHeaders = (withRange) => {
+        const h = { 'User-Agent': UA, 'Accept': '*/*', 'Accept-Language': 'en-US,en;q=0.9' };
+        if (/savetube\./i.test(host)) { h['Referer'] = 'https://yt.savetube.me/'; h['Origin'] = 'https://yt.savetube.me'; }
+        if (withRange && req.headers.range) h['Range'] = req.headers.range;
+        return h;
+    };
 
     // putus koneksi ke CDN kalau pendengar menutup (ganti lagu / app ditutup)
     const ctrl = new AbortController();
     res.on('close', () => { if (!res.writableEnded) ctrl.abort(); });
 
+    const isHtml = (r) => /^(text\/|application\/(json|xml|javascript))/.test((r.headers.get('content-type') || '').toLowerCase());
     let upstream;
-    try { upstream = await fetchUpstream(targetUrl, headers, ctrl.signal); }
-    catch (err) { console.log('[AUDIO] fetch gagal: ' + err.message); if (!res.headersSent) res.status(502).send('Proxy error: ' + err.message); return; }
+    try {
+        upstream = await fetchUpstream(targetUrl, mkHeaders(true), ctrl.signal);
+        // sumber kadang balas halaman web (HTML) kalau ada Range -> coba sekali lagi tanpa Range
+        if (isHtml(upstream) && req.headers.range) {
+            try { await upstream.body?.cancel(); } catch (e) {}
+            upstream = await fetchUpstream(targetUrl, mkHeaders(false), ctrl.signal);
+        }
+    } catch (err) { console.log('[AUDIO] fetch gagal: ' + err.message); if (!res.headersSent) res.status(502).send('Proxy error: ' + err.message); return; }
 
     const ct = (upstream.headers.get('content-type') || '').toLowerCase();
-    try { console.log('[AUDIO] upstream status=' + upstream.status + ' host=' + new URL(targetUrl).host + ' ct=' + ct + ' range=' + (req.headers.range || '-')); } catch (e) {}
-    if (/^(text\/|application\/(json|xml|javascript))/.test(ct)) {
-        try { await upstream.body?.cancel(); } catch (e) {}
-        res.status(415).send('Tipe konten tidak diizinkan');
+    try { console.log('[AUDIO] upstream status=' + upstream.status + ' host=' + host + ' ct=' + ct + ' range=' + (req.headers.range || '-')); } catch (e) {}
+    if (isHtml(upstream)) {
+        let snippet = '';
+        try { snippet = (await upstream.text()).replace(/\s+/g, ' ').slice(0, 300); } catch (e) {}
+        console.log('[AUDIO] sumber balas halaman web, isi: ' + snippet);
+        res.status(502).send('Sumber audio menolak (balas halaman web)');
         return;
     }
 
