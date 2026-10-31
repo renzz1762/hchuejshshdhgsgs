@@ -80,4 +80,11 @@ function wrap(handler, opts) {
     return w;
 }
 
-module.exports = { check, wrap };
+const PRIVATE_HOST = /^(localhost|.*\.(local|internal|localhost)|0\.0\.0\.0|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|169\.254\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|\[.*\])$/i;
+// true = target ditolak (bukan https / alamat internal / ada user:pass)
+function badTarget(u) {
+    try { const p = new URL(u); return p.protocol !== 'https:' || PRIVATE_HOST.test(p.hostname) || !!p.username || !!p.password; }
+    catch (e) { return true; }
+}
+
+module.exports = { check, wrap, badTarget };
